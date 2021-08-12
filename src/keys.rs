@@ -19,13 +19,13 @@ pub struct RSAPrivKey {
     d: BigUint,
 }
 
-pub fn new_keypair(bits: u64, iters: u64) -> (RSAPubKey, RSAPrivKey) {
+pub fn new_keypair(bits: u64) -> (RSAPubKey, RSAPrivKey) {
     let mut rng = rand::thread_rng();
     let pbits = rng.gen_range((bits / 4)..(3 * bits / 4));
     let qbits = bits - pbits;
 
-    let p = makeprime(pbits, iters);
-    let q = makeprime(qbits, iters);
+    let p = makeprime(pbits);
+    let q = makeprime(qbits);
     let n = &p * &q;
     let totient = (&p - 1u8) * (&q - 1u8);
 
@@ -46,6 +46,10 @@ impl RSAPubKey {
     pub fn write<W: Write>(writer: &mut W, pubkey: &Self) -> Result<(), serde_json::Error> {
         serde_json::to_writer(writer, pubkey)
     }
+
+    pub fn encrypt(&self, m: &BigUint) -> BigUint {
+        powermod(m, &self.e, &self.n)
+    }
 }
 
 impl RSAPrivKey {
@@ -56,6 +60,10 @@ impl RSAPrivKey {
     pub fn write<W: Write>(writer: &mut W, privkey: &Self) -> Result<(), serde_json::Error> {
         serde_json::to_writer(writer, privkey)
     }
+
+    pub fn decrypt(&self, c: &BigUint) -> BigUint {
+        powermod(c, &self.d, &self.n)
+    }
 }
 
 #[cfg(test)]
@@ -65,34 +73,38 @@ mod tests {
     use std::io::{BufReader, BufWriter, Cursor};
 
     #[test]
-    fn test_pubkey_io() -> Result<(), Box<dyn Error>> {
-        let mut buffer = Vec::new();
-        let (pubkey, _) = new_keypair(256, 50);
+    fn test_key_io() -> Result<(), Box<dyn Error>> {
+        let (pubkey, privkey) = new_keypair(512);
 
+        let mut buffer = Vec::new();
         let mut writer = BufWriter::new(Cursor::new(&mut buffer));
         RSAPubKey::write(&mut writer, &pubkey)?;
         drop(writer);
 
         let mut reader = BufReader::new(Cursor::new(&mut buffer));
         let keypub = RSAPubKey::read(&mut reader)?;
-
         assert_eq!(pubkey, keypub);
-        Ok(())
-    }
 
-    #[test]
-    fn test_privkey_io() -> Result<(), Box<dyn Error>> {
         let mut buffer = Vec::new();
-        let (_, privkey) = new_keypair(256, 50);
-
         let mut writer = BufWriter::new(Cursor::new(&mut buffer));
         RSAPrivKey::write(&mut writer, &privkey)?;
         drop(writer);
 
         let mut reader = BufReader::new(Cursor::new(&mut buffer));
         let keypriv = RSAPrivKey::read(&mut reader)?;
-
         assert_eq!(privkey, keypriv);
+
         Ok(())
+    }
+
+    #[test]
+    fn test_encrypt_decrypt() {
+        let mut rng = rand::thread_rng();
+        let (pubkey, privkey) = new_keypair(512);
+
+        for _ in 0..10 {
+            let m = rng.gen_biguint(256);
+            assert_eq!(privkey.decrypt(&pubkey.encrypt(&m)), m);
+        }
     }
 }

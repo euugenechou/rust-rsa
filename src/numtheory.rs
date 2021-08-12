@@ -68,7 +68,7 @@ pub fn powermod(a: &BigUint, d: &BigUint, n: &BigUint) -> BigUint {
     v
 }
 
-fn isprime(n: &BigUint, k: u64) -> bool {
+fn isprime(n: &BigUint) -> bool {
     if n < &BigUint::from(2u8) {
         return false; // 0 and 1 aren't prime.
     }
@@ -89,7 +89,8 @@ fn isprime(n: &BigUint, k: u64) -> bool {
 
     let mut rng = rand::thread_rng();
 
-    for _ in 1..=k {
+    // 50 Miller-Rabin iterations.
+    for _ in 1..=50 {
         let a = rng.gen_biguint_range(&BigUint::from(2u8), &(n - 1u8));
         let mut y = powermod(&a, &r, n);
 
@@ -112,11 +113,11 @@ fn isprime(n: &BigUint, k: u64) -> bool {
     true
 }
 
-pub fn makeprime(bits: u64, iters: u64) -> BigUint {
+pub fn makeprime(bits: u64) -> BigUint {
     let mut rng = rand::thread_rng();
     let mut prime = rng.gen_biguint(bits);
 
-    while !isprime(&prime, iters) {
+    while !isprime(&prime) {
         prime = rng.gen_biguint(bits);
     }
 
@@ -137,10 +138,10 @@ mod tests {
             (37, 600, 1),
         ];
 
-        for (a, b, divisor) in tests {
-            let a = BigUint::from(a);
-            let b = BigUint::from(b);
-            let divisor = BigUint::from(divisor);
+        for (a, b, divisor) in &tests {
+            let a = BigUint::from(*a);
+            let b = BigUint::from(*b);
+            let divisor = BigUint::from(*divisor);
             assert_eq!(gcd(&a, &b), divisor);
         }
     }
@@ -160,10 +161,10 @@ mod tests {
             (3, 73714876143, None),
         ];
 
-        for (a, n, inv) in tests {
-            let a = BigUint::from(a);
-            let n = BigUint::from(n);
-            assert_eq!(inverse(&a, &n), inv);
+        for (a, n, inv) in &tests {
+            let a = BigUint::from(*a);
+            let n = BigUint::from(*n);
+            assert_eq!(inverse(&a, &n), *inv);
         }
     }
 
@@ -192,11 +193,11 @@ mod tests {
             ),
         ];
 
-        for (base, exponent, modulus, result) in tests {
-            let a = BigUint::from(base);
-            let d = BigUint::from(exponent);
-            let n = BigUint::from(modulus);
-            let r = BigUint::from(result);
+        for (base, exponent, modulus, result) in &tests {
+            let a = BigUint::from(*base);
+            let d = BigUint::from(*exponent);
+            let n = BigUint::from(*modulus);
+            let r = BigUint::from(*result);
             assert_eq!(powermod(&a, &d, &n), r);
         }
     }
@@ -224,9 +225,9 @@ mod tests {
             (100000004678, false),
         ];
 
-        for (n, primality) in tests {
-            let n = BigUint::from(n);
-            assert_eq!(isprime(&n, 50), primality);
+        for (n, primality) in &tests {
+            let n = BigUint::from(*n);
+            assert_eq!(isprime(&n), *primality);
         }
     }
 }
