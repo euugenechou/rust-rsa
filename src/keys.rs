@@ -5,6 +5,7 @@ use num_bigint::{BigUint, RandBigInt};
 use num_traits::One;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
+use std::error::Error;
 use std::io::prelude::*;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
@@ -50,6 +51,27 @@ impl RSAPubKey {
     pub fn encrypt(&self, m: &BigUint) -> BigUint {
         powermod(m, &self.e, &self.n)
     }
+
+    pub fn stream_encrypt<R: Read, W: Write>(
+        &self,
+        mut reader: R,
+        mut writer: W,
+    ) -> Result<(), Box<dyn Error>> {
+        let blocksize = (((self.n.bits() - 1) / 8) - 1) as usize;
+        let mut buffer = vec![0xFF; blocksize];
+
+        while let Ok(bytes) = reader.read(&mut buffer[1..]) {
+            if bytes == 0 {
+                break;
+            }
+
+            let m = BigUint::from_bytes_le(&buffer[..bytes + 1]);
+            let c = self.encrypt(&m);
+            serde_json::to_writer(&mut writer, &c)?;
+        }
+
+        Ok(())
+    }
 }
 
 impl RSAPrivKey {
@@ -64,12 +86,25 @@ impl RSAPrivKey {
     pub fn decrypt(&self, c: &BigUint) -> BigUint {
         powermod(c, &self.d, &self.n)
     }
+
+    pub fn stream_decrypt<R: Read, W: Write>(
+        &self,
+        mut reader: R,
+        mut writer: W,
+    ) -> Result<(), Box<dyn Error>> {
+        while let Ok(c) = serde_json::from_reader(&mut reader) {
+            let m = self.decrypt(&c);
+            let bytes = m.to_bytes_le();
+            writer.write_all(&bytes[1..])?;
+        }
+
+        Ok(())
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::error::Error;
     use std::io::{BufReader, BufWriter, Cursor};
 
     #[test]
@@ -106,5 +141,26 @@ mod tests {
             let m = rng.gen_biguint(256);
             assert_eq!(privkey.decrypt(&pubkey.encrypt(&m)), m);
         }
+    }
+
+    #[test]
+    fn test_stream_encrypt_decrypt() -> Result<(), Box<dyn Error>> {
+        let (pubkey, privkey) = new_keypair(512);
+
+        let mut data = b"hello world";
+        let mut encrypted = Vec::new();
+        let mut reader = BufReader::new(Cursor::new(&mut data));
+        let mut writer = BufWriter::new(Cursor::new(&mut encrypted));
+        pubkey.stream_encrypt(&mut reader, &mut writer)?;
+        drop(writer);
+
+        let mut data = Vec::new();
+        let mut reader = BufReader::new(Cursor::new(&mut encrypted));
+        let mut writer = BufWriter::new(Cursor::new(&mut data));
+        privkey.stream_decrypt(&mut reader, &mut writer)?;
+        drop(writer);
+
+        assert_eq!(data, b"hello world");
+        Ok(())
     }
 }
