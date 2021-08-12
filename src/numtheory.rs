@@ -7,7 +7,7 @@ pub fn gcd(a: &BigUint, b: &BigUint) -> BigUint {
     let mut x = a.clone();
     let mut y = b.clone();
 
-    while y != Zero::zero() {
+    while y != BigUint::zero() {
         let t = y.clone();
         y = x % y;
         x = t;
@@ -19,10 +19,10 @@ pub fn gcd(a: &BigUint, b: &BigUint) -> BigUint {
 pub fn inverse(a: &BigUint, n: &BigUint) -> Option<BigUint> {
     let mut r = BigInt::from_biguint(Sign::Plus, n.clone());
     let mut rp = BigInt::from_biguint(Sign::Plus, a.clone());
-    let mut t = BigInt::from(0);
-    let mut tp = BigInt::from(1);
+    let mut t = BigInt::zero();
+    let mut tp = BigInt::one();
 
-    while rp != Zero::zero() {
+    while rp != BigInt::zero() {
         let q = &r / &rp;
 
         let tmp = r.clone();
@@ -34,10 +34,10 @@ pub fn inverse(a: &BigUint, n: &BigUint) -> Option<BigUint> {
         tp = tmp - &q * &tp;
     }
 
-    if r > One::one() {
+    if r > BigInt::one() {
         return None;
     }
-    if t < Zero::zero() {
+    if t < BigInt::zero() {
         t += BigInt::from_biguint(Sign::Plus, n.clone());
     }
 
@@ -45,19 +45,19 @@ pub fn inverse(a: &BigUint, n: &BigUint) -> Option<BigUint> {
 }
 
 fn odd(n: &BigUint) -> bool {
-    n & BigUint::from(1u8) == BigUint::from(1u8)
+    n & BigUint::one() == BigUint::one()
 }
 
 fn even(n: &BigUint) -> bool {
-    n & BigUint::from(1u8) == BigUint::from(0u8)
+    n & BigUint::one() == BigUint::zero()
 }
 
 pub fn powermod(a: &BigUint, d: &BigUint, n: &BigUint) -> BigUint {
     let mut p = a.clone();
     let mut t = d.clone();
-    let mut v = BigUint::from(1u8);
+    let mut v = BigUint::one();
 
-    while t > Zero::zero() {
+    while t > BigUint::zero() {
         if odd(&t) {
             v = (&v * &p) % n;
         }
@@ -80,7 +80,7 @@ fn isprime(n: &BigUint) -> bool {
     }
 
     // Write n - 1 = r2^s such that r is odd.
-    let mut s = BigUint::from(0u8);
+    let mut s = BigUint::zero();
     let mut r = n - 1u8;
     while even(&r) {
         s += 1u8;
@@ -94,11 +94,11 @@ fn isprime(n: &BigUint) -> bool {
         let a = rng.gen_biguint_range(&BigUint::from(2u8), &(n - 1u8));
         let mut y = powermod(&a, &r, n);
 
-        if y != One::one() && y != n - 1u8 {
+        if y != BigUint::one() && y != n - 1u8 {
             let mut j = BigUint::from(1u8);
             while j < s && y != n - 1u8 {
                 y = powermod(&y, &BigUint::from(2u8), n);
-                if y == One::one() {
+                if y == BigUint::one() {
                     return false;
                 }
                 j += 1u8;
