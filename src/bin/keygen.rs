@@ -11,10 +11,10 @@ struct Opt {
     #[clap(long, default_value = "512")]
     bits: u64,
 
-    #[clap(long, default_value = "rsa.pub")]
+    #[clap(long, default_value = "/tmp/rsa.pub")]
     pbfile: OsString,
 
-    #[clap(long, default_value = "rsa.priv")]
+    #[clap(long, default_value = "/tmp/rsa.priv")]
     pvfile: OsString,
 }
 
