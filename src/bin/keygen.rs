@@ -1,5 +1,5 @@
 use clap::Clap;
-use rust_rsa::{RSAPrivKey, RSAPubKey};
+use rust_rsa::{PrivKey, PubKey};
 use std::error::Error;
 use std::ffi::OsString;
 use std::fs::OpenOptions;
@@ -36,8 +36,8 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut privwriter = BufWriter::new(pvfile);
 
     let (pubkey, privkey) = rust_rsa::new_keypair(opt.bits);
-    RSAPubKey::write(&mut pubwriter, &pubkey)?;
-    RSAPrivKey::write(&mut privwriter, &privkey)?;
+    PubKey::write(&mut pubwriter, &pubkey)?;
+    PrivKey::write(&mut privwriter, &privkey)?;
 
     Ok(())
 }

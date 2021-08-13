@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use super::numtheory::*;
 use num_bigint::{BigUint, RandBigInt};
 use num_traits::One;
@@ -9,18 +7,18 @@ use std::error::Error;
 use std::io::prelude::*;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct RSAPubKey {
+pub struct PubKey {
     n: BigUint,
     e: BigUint,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
-pub struct RSAPrivKey {
+pub struct PrivKey {
     n: BigUint,
     d: BigUint,
 }
 
-pub fn new_keypair(bits: u64) -> (RSAPubKey, RSAPrivKey) {
+pub fn new_keypair(bits: u64) -> (PubKey, PrivKey) {
     let mut rng = rand::thread_rng();
     let pbits = rng.gen_range((bits / 4)..(3 * bits / 4));
     let qbits = bits - pbits;
@@ -36,10 +34,10 @@ pub fn new_keypair(bits: u64) -> (RSAPubKey, RSAPrivKey) {
     }
     let d = inverse(&e, &totient).unwrap();
 
-    (RSAPubKey { n: n.clone(), e }, RSAPrivKey { n, d })
+    (PubKey { n: n.clone(), e }, PrivKey { n, d })
 }
 
-impl RSAPubKey {
+impl PubKey {
     pub fn read<R: Read>(reader: &mut R) -> Result<Self, serde_json::Error> {
         serde_json::from_reader(reader)
     }
@@ -74,7 +72,7 @@ impl RSAPubKey {
     }
 }
 
-impl RSAPrivKey {
+impl PrivKey {
     pub fn read<R: Read>(reader: &mut R) -> Result<Self, serde_json::Error> {
         serde_json::from_reader(reader)
     }
@@ -113,20 +111,20 @@ mod tests {
 
         let mut buffer = Vec::new();
         let mut writer = BufWriter::new(Cursor::new(&mut buffer));
-        RSAPubKey::write(&mut writer, &pubkey)?;
+        PubKey::write(&mut writer, &pubkey)?;
         drop(writer);
 
         let mut reader = BufReader::new(Cursor::new(&mut buffer));
-        let keypub = RSAPubKey::read(&mut reader)?;
+        let keypub = PubKey::read(&mut reader)?;
         assert_eq!(pubkey, keypub);
 
         let mut buffer = Vec::new();
         let mut writer = BufWriter::new(Cursor::new(&mut buffer));
-        RSAPrivKey::write(&mut writer, &privkey)?;
+        PrivKey::write(&mut writer, &privkey)?;
         drop(writer);
 
         let mut reader = BufReader::new(Cursor::new(&mut buffer));
-        let keypriv = RSAPrivKey::read(&mut reader)?;
+        let keypriv = PrivKey::read(&mut reader)?;
         assert_eq!(privkey, keypriv);
 
         Ok(())

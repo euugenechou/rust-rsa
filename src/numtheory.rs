@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use num_bigint::{BigInt, BigUint, RandBigInt, Sign};
 use num_traits::{One, Zero};
 
