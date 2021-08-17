@@ -1,36 +1,30 @@
 use super::numtheory::*;
-use num_bigint::{BigUint, RandBigInt};
-use num_traits::One;
-use rand::Rng;
+use rug::{integer::Order, Integer};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::io::prelude::*;
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct PubKey {
-    n: BigUint,
-    e: BigUint,
+    pub n: Integer,
+    pub e: Integer,
 }
 
 #[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
 pub struct PrivKey {
-    n: BigUint,
-    d: BigUint,
+    n: Integer,
+    d: Integer,
 }
 
-pub fn new_keypair(bits: u64) -> (PubKey, PrivKey) {
-    let mut rng = rand::thread_rng();
-    let pbits = rng.gen_range((bits / 4)..(3 * bits / 4));
-    let qbits = bits - pbits;
+pub fn new_keypair(bits: u32) -> (PubKey, PrivKey) {
+    let p = makeprime(bits / 2);
+    let q = makeprime(bits / 2 + 1);
+    let n = Integer::from(&p * &q);
+    let totient = Integer::from(&p - 1) * Integer::from(&q - 1);
 
-    let p = makeprime(pbits);
-    let q = makeprime(qbits);
-    let n = &p * &q;
-    let totient = (&p - 1u8) * (&q - 1u8);
-
-    let mut e = rng.gen_biguint(bits);
-    while gcd(&e, &totient) != One::one() {
-        e = rng.gen_biguint(bits);
+    let mut e = makeprime(bits / 2);
+    while gcd(&e, &totient) != 1 {
+        e = makeprime(bits / 2);
     }
     let d = inverse(&e, &totient).unwrap();
 
@@ -38,22 +32,18 @@ pub fn new_keypair(bits: u64) -> (PubKey, PrivKey) {
 }
 
 impl PubKey {
-    pub fn new(bits: u64) -> Self {
-        let mut rng = rand::thread_rng();
-        let pbits = rng.gen_range((bits / 4)..(3 * bits / 4));
-        let qbits = bits - pbits;
+    pub fn new(bits: u32) -> Self {
+        let p = makeprime(bits / 2);
+        let q = makeprime(bits / 2 + 1);
+        let n = Integer::from(&p * &q);
+        let totient = Integer::from(&p - 1) * Integer::from(&q - 1);
 
-        let p = makeprime(pbits);
-        let q = makeprime(qbits);
-        let n = &p * &q;
-        let totient = (&p - 1u8) * (&q - 1u8);
-
-        let mut e = rng.gen_biguint(bits);
-        while gcd(&e, &totient) != One::one() {
-            e = rng.gen_biguint(bits);
+        let mut e = makeprime(bits / 2);
+        while gcd(&e, &totient) != 1 {
+            e = makeprime(bits / 2);
         }
 
-        Self { n, e }
+        PubKey { n, e }
     }
 
     pub fn read<R: Read>(reader: &mut R) -> Result<Self, serde_json::Error> {
@@ -64,7 +54,7 @@ impl PubKey {
         serde_json::to_writer(writer, pubkey)
     }
 
-    pub fn encrypt(&self, m: &BigUint) -> BigUint {
+    pub fn encrypt(&self, m: &Integer) -> Integer {
         powermod(m, &self.e, &self.n)
     }
 
@@ -73,7 +63,7 @@ impl PubKey {
         mut reader: R,
         mut writer: W,
     ) -> Result<(), Box<dyn Error>> {
-        let blocksize = (((self.n.bits() - 1) / 8) - 1) as usize;
+        let blocksize = (((self.n.significant_bits() - 1) / 8) - 1) as usize;
         let mut buffer = vec![0xFF; blocksize];
 
         while let Ok(bytes) = reader.read(&mut buffer[1..]) {
@@ -81,7 +71,7 @@ impl PubKey {
                 break;
             }
 
-            let m = BigUint::from_bytes_le(&buffer[..bytes + 1]);
+            let m = Integer::from_digits::<u8>(&buffer[..bytes + 1], Order::MsfBe);
             let c = self.encrypt(&m);
             serde_json::to_writer(&mut writer, &c)?;
         }
@@ -99,7 +89,7 @@ impl PrivKey {
         serde_json::to_writer(writer, privkey)
     }
 
-    pub fn decrypt(&self, c: &BigUint) -> BigUint {
+    pub fn decrypt(&self, c: &Integer) -> Integer {
         powermod(c, &self.d, &self.n)
     }
 
@@ -110,7 +100,7 @@ impl PrivKey {
     ) -> Result<(), Box<dyn Error>> {
         while let Ok(c) = serde_json::from_reader(&mut reader) {
             let m = self.decrypt(&c);
-            let bytes = m.to_bytes_le();
+            let bytes = m.to_digits::<u8>(Order::MsfBe);
             writer.write_all(&bytes[1..])?;
         }
 
@@ -125,7 +115,7 @@ mod tests {
 
     #[test]
     fn test_key_io() -> Result<(), Box<dyn Error>> {
-        let (pubkey, privkey) = new_keypair(512);
+        let (pubkey, privkey) = new_keypair(4096);
 
         let mut buffer = Vec::new();
         let mut writer = BufWriter::new(Cursor::new(&mut buffer));
@@ -149,19 +139,8 @@ mod tests {
     }
 
     #[test]
-    fn test_encrypt_decrypt() {
-        let mut rng = rand::thread_rng();
-        let (pubkey, privkey) = new_keypair(512);
-
-        for _ in 0..10 {
-            let m = rng.gen_biguint(256);
-            assert_eq!(privkey.decrypt(&pubkey.encrypt(&m)), m);
-        }
-    }
-
-    #[test]
-    fn test_stream_encrypt_decrypt() -> Result<(), Box<dyn Error>> {
-        let (pubkey, privkey) = new_keypair(512);
+    fn test_encrypt_decrypt() -> Result<(), Box<dyn Error>> {
+        let (pubkey, privkey) = new_keypair(4096);
 
         let mut data = b"hello world";
         let mut encrypted = Vec::new();

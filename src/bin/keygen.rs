@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         .open(matches.value_of("pvfile").unwrap_or("tmp/rsa.priv"))?;
     let mut privwriter = BufWriter::new(pvfile);
 
-    let bits = value_t!(matches, "bits", u64).unwrap_or(512);
+    let bits = value_t!(matches, "bits", u32).unwrap_or(512);
     let (pubkey, privkey) = rust_rsa::new_keypair(bits);
     PubKey::write(&mut pubwriter, &pubkey)?;
     PrivKey::write(&mut privwriter, &privkey)?;

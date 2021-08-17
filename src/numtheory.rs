@@ -1,122 +1,41 @@
-use num_bigint::{BigInt, BigUint, RandBigInt, Sign};
-use num_traits::{One, Zero};
+use rug::{integer::IsPrime, rand::RandState, Integer};
 
-pub fn gcd(a: &BigUint, b: &BigUint) -> BigUint {
-    let mut x = a.clone();
-    let mut y = b.clone();
-
-    while y != BigUint::zero() {
-        let t = y.clone();
-        y = x % y;
-        x = t;
-    }
-
-    x
+pub fn gcd(a: &Integer, b: &Integer) -> Integer {
+    let a = Integer::from(a);
+    let b = Integer::from(b);
+    a.gcd(&b)
 }
 
-pub fn inverse(a: &BigUint, n: &BigUint) -> Option<BigUint> {
-    let mut r = BigInt::from_biguint(Sign::Plus, n.clone());
-    let mut rp = BigInt::from_biguint(Sign::Plus, a.clone());
-    let mut t = BigInt::zero();
-    let mut tp = BigInt::one();
-
-    while rp != BigInt::zero() {
-        let q = &r / &rp;
-
-        let tmp = r.clone();
-        r = rp.clone();
-        rp = tmp - &q * &rp;
-
-        let tmp = t.clone();
-        t = tp.clone();
-        tp = tmp - &q * &tp;
+pub fn inverse(a: &Integer, n: &Integer) -> Option<Integer> {
+    let a = Integer::from(a);
+    let n = Integer::from(n);
+    match a.invert(&n) {
+        Ok(i) => Some(i),
+        Err(_) => None,
     }
-
-    if r > BigInt::one() {
-        return None;
-    }
-    if t < BigInt::zero() {
-        t += BigInt::from_biguint(Sign::Plus, n.clone());
-    }
-
-    Some(t.magnitude().clone())
 }
 
-fn odd(n: &BigUint) -> bool {
-    n & BigUint::one() == BigUint::one()
+pub fn powermod(a: &Integer, d: &Integer, n: &Integer) -> Integer {
+    let a = Integer::from(a);
+    let d = Integer::from(d);
+    let n = Integer::from(n);
+    a.pow_mod(&d, &n).unwrap()
 }
 
-fn even(n: &BigUint) -> bool {
-    n & BigUint::one() == BigUint::zero()
+fn isprime(n: &Integer) -> bool {
+    match n.is_probably_prime(30) {
+        IsPrime::Yes => true,
+        IsPrime::Probably => true,
+        IsPrime::No => false,
+    }
 }
 
-pub fn powermod(a: &BigUint, d: &BigUint, n: &BigUint) -> BigUint {
-    let mut p = a.clone();
-    let mut t = d.clone();
-    let mut v = BigUint::one();
-
-    while t > BigUint::zero() {
-        if odd(&t) {
-            v = (&v * &p) % n;
-        }
-        p = (&p * &p) % n;
-        t >>= 1;
-    }
-
-    v
-}
-
-fn isprime(n: &BigUint) -> bool {
-    if n < &BigUint::from(2u8) {
-        return false; // 0 and 1 aren't prime.
-    }
-    if n < &BigUint::from(4u8) {
-        return true; // 2 and 3 are prime.
-    }
-    if even(n) {
-        return false; // Evens after 2 aren't prime.
-    }
-
-    // Write n - 1 = r2^s such that r is odd.
-    let mut s = BigUint::zero();
-    let mut r = n - 1u8;
-    while even(&r) {
-        s += 1u8;
-        r >>= 1u8;
-    }
-
-    let mut rng = rand::thread_rng();
-
-    // 50 Miller-Rabin iterations.
-    for _ in 1..=50 {
-        let a = rng.gen_biguint_range(&BigUint::from(2u8), &(n - 1u8));
-        let mut y = powermod(&a, &r, n);
-
-        if y != BigUint::one() && y != n - 1u8 {
-            let mut j = BigUint::from(1u8);
-            while j < s && y != n - 1u8 {
-                y = powermod(&y, &BigUint::from(2u8), n);
-                if y == BigUint::one() {
-                    return false;
-                }
-                j += 1u8;
-            }
-
-            if y != n - 1u8 {
-                return false;
-            }
-        }
-    }
-
-    true
-}
-
-pub fn makeprime(bits: u64) -> BigUint {
-    let mut rng = rand::thread_rng();
-    let mut prime = rng.gen_biguint(bits);
+pub fn makeprime(bits: u32) -> Integer {
+    let mut state = RandState::new();
+    let mut prime = Integer::from(Integer::random_bits(bits, &mut state));
 
     while !isprime(&prime) {
-        prime = rng.gen_biguint(bits);
+        prime = Integer::from(Integer::random_bits(bits, &mut state));
     }
 
     prime
@@ -137,31 +56,31 @@ mod tests {
         ];
 
         for (a, b, divisor) in &tests {
-            let a = BigUint::from(*a);
-            let b = BigUint::from(*b);
-            let divisor = BigUint::from(*divisor);
+            let a = Integer::from(*a);
+            let b = Integer::from(*b);
+            let divisor = Integer::from(*divisor);
             assert_eq!(gcd(&a, &b), divisor);
         }
     }
 
     #[test]
     fn test_inverse() {
-        let tests: [(u128, u128, Option<BigUint>); 10] = [
-            (5, 13, Some(BigUint::from(8u8))),
-            (1, 2, Some(BigUint::from(1u8))),
+        let tests: [(u128, u128, Option<Integer>); 10] = [
+            (5, 13, Some(Integer::from(8u8))),
+            (1, 2, Some(Integer::from(1u8))),
             (3, 6, None),
-            (7, 87, Some(BigUint::from(25u8))),
-            (25, 87, Some(BigUint::from(7u8))),
-            (2, 91, Some(BigUint::from(46u8))),
+            (7, 87, Some(Integer::from(25u8))),
+            (25, 87, Some(Integer::from(7u8))),
+            (2, 91, Some(Integer::from(46u8))),
             (13, 91, None),
-            (19, 1212393831, Some(BigUint::from(701912218u128))),
-            (31, 73714876143, Some(BigUint::from(45180085378u128))),
+            (19, 1212393831, Some(Integer::from(701912218u128))),
+            (31, 73714876143, Some(Integer::from(45180085378u128))),
             (3, 73714876143, None),
         ];
 
         for (a, n, inv) in &tests {
-            let a = BigUint::from(*a);
-            let n = BigUint::from(*n);
+            let a = Integer::from(*a);
+            let n = Integer::from(*n);
             assert_eq!(inverse(&a, &n), *inv);
         }
     }
@@ -192,10 +111,10 @@ mod tests {
         ];
 
         for (base, exponent, modulus, result) in &tests {
-            let a = BigUint::from(*base);
-            let d = BigUint::from(*exponent);
-            let n = BigUint::from(*modulus);
-            let r = BigUint::from(*result);
+            let a = Integer::from(*base);
+            let d = Integer::from(*exponent);
+            let n = Integer::from(*modulus);
+            let r = Integer::from(*result);
             assert_eq!(powermod(&a, &d, &n), r);
         }
     }
@@ -224,7 +143,7 @@ mod tests {
         ];
 
         for (n, primality) in &tests {
-            let n = BigUint::from(*n);
+            let n = Integer::from(*n);
             assert_eq!(isprime(&n), *primality);
         }
     }
