@@ -38,6 +38,24 @@ pub fn new_keypair(bits: u64) -> (PubKey, PrivKey) {
 }
 
 impl PubKey {
+    pub fn new(bits: u64) -> Self {
+        let mut rng = rand::thread_rng();
+        let pbits = rng.gen_range((bits / 4)..(3 * bits / 4));
+        let qbits = bits - pbits;
+
+        let p = makeprime(pbits);
+        let q = makeprime(qbits);
+        let n = &p * &q;
+        let totient = (&p - 1u8) * (&q - 1u8);
+
+        let mut e = rng.gen_biguint(bits);
+        while gcd(&e, &totient) != One::one() {
+            e = rng.gen_biguint(bits);
+        }
+
+        Self { n, e }
+    }
+
     pub fn read<R: Read>(reader: &mut R) -> Result<Self, serde_json::Error> {
         serde_json::from_reader(reader)
     }

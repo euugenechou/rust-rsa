@@ -4,7 +4,7 @@ name = "rust-rsa"
 version = "0.1.0"
 
 [dependencies]
-clap = "3.0.0-beta.2"
+clap = "2.0"
 rand = "0.8"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -22,3 +22,10 @@ path = "src/bin/encrypt.rs"
 [[bin]]
 name = "decrypt"
 path = "src/bin/decrypt.rs"
+
+[dev-dependencies]
+criterion = "0.3"
+
+[[bench]]
+name = "keygen"
+harness = false
